@@ -1,0 +1,4 @@
+import {NextResponse} from 'next/server';
+import {readDB} from '@/lib/db';
+import {can,requireUser} from '@/lib/auth';
+export async function GET(req:Request){try{const user=await requireUser();if(!can(user,'viewAudit'))return NextResponse.json({error:'Forbidden'},{status:403});const db=readDB();const url=new URL(req.url);const q=(url.searchParams.get('q')||'').toLowerCase();const action=url.searchParams.get('action')||'All';const entity=url.searchParams.get('entity')||'All';const rows=(db.auditLogs||[]).filter(a=>(action==='All'||a.action===action)&&(entity==='All'||a.entity===entity)&&(!q||`${a.user} ${a.entity} ${a.entityId} ${a.details} ${JSON.stringify(a.changes||[])}`.toLowerCase().includes(q)));return NextResponse.json({auditLogs:rows});}catch(e){return NextResponse.json({error:e instanceof Error&&e.message==='UNAUTHORIZED'?'Unauthorized':'Audit failed'},{status:e instanceof Error&&e.message==='UNAUTHORIZED'?401:500});}}

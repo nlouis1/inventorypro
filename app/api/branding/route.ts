@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';import {readDB} from '@/lib/db';export async function GET(){try{const s=readDB().settings;return NextResponse.json({systemName:s?.systemName||'InventoryPro HQ',logoDataUrl:s?.logoDataUrl||''},{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({systemName:'InventoryPro HQ',logoDataUrl:''})}}

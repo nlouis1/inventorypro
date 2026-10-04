@@ -1,0 +1,73 @@
+{
+  "name": "inventorypro-hq",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "npm run typecheck",
+    "desktop:package": "node scripts/package-desktop.cjs",
+    "desktop:build": "npm run build && npm run desktop:package",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "lucide-react": "^0.468.0",
+    "recharts": "^2.15.0",
+    "bcryptjs": "^2.4.3",
+    "sweetalert2": "^11.26.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "rw.inventorypro.hq",
+    "productName": "InventoryPro HQ",
+    "asar": false,
+    "directories": {
+      "output": "release-build"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "desktop-resources/app-server",
+        "to": "app-server",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "desktop-resources/default-db.json",
+        "to": "default-db.json"
+      },
+      {
+        "from": "desktop-resources/app-node.exe",
+        "to": "app-node.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "InventoryPro-HQ-${version}-${arch}.${ext}"
+    },
+    "npmRebuild": false
+  },
+  "main": "desktop/main.cjs"
+}
