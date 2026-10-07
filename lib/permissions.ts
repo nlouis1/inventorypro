@@ -90,10 +90,22 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<RolePermissions>> 
   },
 };
 
+export const SETTINGS_PRIVILEGES = ['manageProfile','manageSettings','backupSystem','resetSystemData'] as const;
+export type SettingsPrivilege = typeof SETTINGS_PRIVILEGES[number];
+
 export function normalizePermissions(input: Record<string, boolean>|undefined): RolePermissions {
   const result = {} as RolePermissions;
   for (const p of PRIVILEGES) result[p] = input?.[p] === true;
   return result;
+}
+
+export function hasAnySettingsPermission(permissions: RolePermissions|Record<string, boolean>|undefined): boolean {
+  return SETTINGS_PRIVILEGES.some(p => permissions?.[p] === true);
+}
+
+export function canSeeSettingsSection(permissions: RolePermissions|Record<string, boolean>|undefined, section: keyof typeof SETTINGS_SECTION_PRIVILEGES): boolean {
+  const required = SETTINGS_SECTION_PRIVILEGES[section];
+  return permissions?.[required] === true;
 }
 
 export function rolePermissions(role: string, input?: Record<string, boolean>): RolePermissions {
@@ -106,8 +118,10 @@ export function rolePermissions(role: string, input?: Record<string, boolean>): 
  * Canonical API contract. Authentication-only endpoints are deliberately absent.
  * Every protected application API operation maps to exactly one privilege.
  */
-export const ROUTE_PRIVILEGES: Record<string, Record<string, Privilege>> = {
-  '/api/bootstrap': { GET:'viewDashboard' },
+export const ROUTE_PRIVILEGES: Record<string, Record<string, Privilege|readonly Privilege[]>> = {
+  // Bootstrap is an authenticated data aggregator. Its payload is filtered by each privilege;
+  // requiring viewDashboard here would incorrectly block users who only have another view privilege.
+
   '/api/audit': { GET:'viewAudit' },
   '/api/users': { POST:'manageUsers', PATCH:'manageUsers' },
   '/api/roles': { POST:'manageRoles', PATCH:'manageRoles', DELETE:'manageRoles' },
@@ -119,7 +133,9 @@ export const ROUTE_PRIVILEGES: Record<string, Record<string, Privilege>> = {
   '/api/activities': { GET:'viewActivities', POST:'manageExpenses', DELETE:'manageExpenses' },
   '/api/stores': { POST:'manageStores' },
   '/api/reports': { GET:'viewReports' },
-  '/api/settings': { GET:'viewDashboard', PATCH:'manageSettings' },
+  // Settings GET is an any-of authorization endpoint; the route itself checks
+  // manageProfile OR manageSettings OR backupSystem OR resetSystemData.
+  '/api/settings': { GET:['manageProfile','manageSettings','backupSystem','resetSystemData'], PATCH:'manageSettings' },
   '/api/export': { GET:'exportInventory' },
   '/api/posted-notes': { GET:'viewPostedNotes', POST:'postPostedNotes' },
   '/api/backup': { GET:'backupSystem' },
@@ -127,6 +143,20 @@ export const ROUTE_PRIVILEGES: Record<string, Record<string, Privilege>> = {
   '/api/profile': { PATCH:'manageProfile', POST:'manageProfile' },
 };
 
-export function privilegeForRoute(pathname: string, method: string): Privilege|undefined {
-  return ROUTE_PRIVILEGES[pathname]?.[method.toUpperCase()];
+export function privilegesForRoute(pathname: string, method: string): Privilege[] {
+  const value=ROUTE_PRIVILEGES[pathname]?.[method.toUpperCase()];
+  if(!value) return [];
+  return Array.isArray(value) ? [...value] as Privilege[] : [value as Privilege];
 }
+
+export function privilegeForRoute(pathname: string, method: string): Privilege|undefined {
+  return privilegesForRoute(pathname,method)[0];
+}
+
+/** Exact Settings visibility: each section is independently controlled. */
+export const SETTINGS_SECTION_PRIVILEGES = {
+  profile: 'manageProfile',
+  system: 'manageSettings',
+  backup: 'backupSystem',
+  reset: 'resetSystemData',
+} as const;

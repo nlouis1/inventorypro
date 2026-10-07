@@ -24,13 +24,13 @@ export async function GET(req:Request){
     if(!from || !to) return NextResponse.json({error:'Both from and to dates are required'},{status:400});
     const start=dayStart(from), end=dayEnd(to);
     if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())||start>end) return NextResponse.json({error:'Invalid date range'},{status:400});
-    const activeIds=new Set(items.map(i=>i.id));const movements=db.transactions.filter(t=>activeIds.has(t.itemId)).filter(t=>{const d=new Date(t.timestamp);return d>=start&&d<=end;});
+    const reportItemIds=new Set(db.items.map(i=>i.id));const movements=db.transactions.filter(t=>reportItemIds.has(t.itemId)).filter(t=>{const d=new Date(t.timestamp);return d>=start&&d<=end;});
     const activities=(db.activities||[]).filter(a=>{const d=new Date(a.date);return d>=start&&d<=end;});
     const stockIn=movements.filter(t=>t.type==='IN');
     const stockOut=movements.filter(t=>t.type==='OUT');
     const adjustment=movements.filter(t=>t.type==='ADJUSTMENT');
     const transfer=movements.filter(t=>t.type==='TRANSFER');
-    const itemById=(id:string)=>db.items.find(i=>i.status!=='DISABLED'&&i.id===id); const itemName=(id:string)=>itemById(id)?.name||id;
+    const itemById=(id:string)=>db.items.find(i=>i.id===id); const itemName=(id:string)=>itemById(id)?.name||id;
     const rows=movements.map(t=>({id:t.id,date:t.timestamp,type:t.type,itemId:t.itemId,itemName:itemName(t.itemId),category:itemById(t.itemId)?.category||'',itemType:itemById(t.itemId)?.itemType||'General',measurementUnit:itemById(t.itemId)?.measurementUnit||'Piece',qty:t.qty,storeId:t.storeId,store:db.stores.find(s=>s.id===t.storeId)?.name||t.storeId,user:t.user,recipient:t.recipient||'',reference:t.reference||'',note:t.note||'',buyPrice:Number(t.buyPrice??0),sellPrice:Number(t.sellPrice??t.unitPrice??0),salesValue:Number(t.type==='OUT'?(t.totalValue??Number(t.qty||0)*Number(t.sellPrice??t.unitPrice??0)):0),taxRate:Number(t.type==='OUT' ? (db.receipts.find(x=>x.id===t.receiptId)?.taxRate ?? configuredTaxRate ?? 0) : 0),taxAmount:Number(t.type==='OUT' ? (db.receipts.find(x=>x.id===t.receiptId)?.taxAmount ?? 0) / Math.max(1,(db.receipts.find(x=>x.id===t.receiptId)?.transactionIds||[]).length) : 0),costValue:Number(t.type==='IN'?Number(t.qty||0)*Number(t.buyPrice??0):(t.costValue??0)),profit:Number(t.type==='OUT'?(t.profit??(Number(t.totalValue??Number(t.qty||0)*Number(t.sellPrice??t.unitPrice??0))-Number(t.costValue??Number(t.qty||0)*Number(t.buyPrice??0)))):0),receiptId:t.receiptId||''}));
     const sum=(arr:any[],key:string)=>arr.reduce((n,t)=>n+Number(t[key]||0),0);
     const activityTotal=activities.reduce((n,a)=>n+Number(a.amount||0),0);

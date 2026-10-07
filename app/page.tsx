@@ -1,3 +1,4 @@
 import {redirect} from 'next/navigation';
-import {currentUser} from '@/lib/auth';
-export default async function Home(){const user=await currentUser();redirect(user?'/dashboard':'/login');}
+import {currentUser,can} from '@/lib/auth';
+import {PRIVILEGES} from '@/lib/permissions';
+export default async function Home(){const user=await currentUser();if(!user){redirect('/login');return null;}const hasApplicationAccess=PRIVILEGES.some((priv)=>can(user,priv));redirect(hasApplicationAccess?'/dashboard':'/login');}

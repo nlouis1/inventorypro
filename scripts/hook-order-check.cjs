@@ -1,0 +1,15 @@
+const fs=require('fs');
+const path=require('path');
+const file=path.join(process.cwd(),'components','DashboardClient.tsx');
+const s=fs.readFileSync(file,'utf8');
+const start=s.indexOf('export default function DashboardClient');
+const end=s.indexOf('\nfunction Dashboard(',start);
+const body=s.slice(start,end);
+const firstConditionalReturn=Math.min(...['if(loading)return','if(loadError)return'].map(x=>{const i=body.indexOf(x);return i<0?Infinity:i}));
+const hookMatches=[...body.matchAll(/use(?:State|Effect|Memo|Callback|Ref|Reducer|LayoutEffect)\s*\(/g)];
+const lastHook=hookMatches.length?hookMatches[hookMatches.length-1].index:-1;
+if(firstConditionalReturn===Infinity) throw new Error('DashboardClient loading guards not found');
+const before=body.slice(0,firstConditionalReturn);
+if(!/useEffect\s*\(/.test(before)) throw new Error('Expected navigation effect before loading guards');
+if(lastHook>=firstConditionalReturn) throw new Error('Hook appears after a conditional return in DashboardClient');
+console.log('Hook-order check passed.');

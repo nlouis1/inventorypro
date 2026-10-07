@@ -1,13 +1,14 @@
 import {NextResponse} from 'next/server';
 import {readDB,writeDB,sanitizeUser,audit} from '@/lib/db';
 import {createSession,verifyPassword} from '@/lib/auth';
+import {email as validateEmail,password as validatePassword,readJson} from '@/lib/validation';
 
 export async function POST(req:Request){
   try{
-    const body=await req.json();
-    const email=String(body.email??'').trim().toLowerCase();
+    const body=await readJson<Record<string,unknown>>(req);
+    const email=validateEmail(body.email);
     const password=String(body.password??'');
-    if(!email||!password)return NextResponse.json({error:'Email and password are required'},{status:400});
+    if(!password||password.length>128)return NextResponse.json({error:'Password is required and cannot exceed 128 characters.'},{status:400});
     const db=readDB();
     const user=db.users.find(u=>u.email.trim().toLowerCase()===email);
     if(!user)return NextResponse.json({error:'Invalid email or password'},{status:401});
@@ -19,6 +20,6 @@ export async function POST(req:Request){
     return NextResponse.json({ok:true,user:sanitizeUser(user)});
   }catch(error){
     console.error('Login error:',error);
-    return NextResponse.json({error:'Unable to sign in. Check the server configuration.'},{status:500});
+    return NextResponse.json({error:error instanceof Error&&error.name==='ValidationError'?error.message:'Unable to sign in. Check the server configuration.'},{status:error instanceof Error&&error.name==='ValidationError'?400:500});
   }
 }

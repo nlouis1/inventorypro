@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {normalizePermissions, rolePermissions, PRIVILEGES} from './permissions';
+import {rolePermissions} from './permissions';
 
 export type Store={id:string;name:string;code:string;location:string;manager:string};
 export type Item={id:string;name:string;category:string;itemType?:string;measurementUnit?:string;storeId:string;quantity:number;minThreshold:number;buyPrice:number;sellPrice:number;unitPrice?:number;barcode:string;createdAt:string;status?:'ACTIVE'|'DISABLED';disabledAt?:string;disabledById?:string;disabledByName?:string;disabledReason?:string};
@@ -8,7 +8,7 @@ export type User={id:string;name:string;email:string;passwordHash:string;role:st
 export type Session={id:string;userId:string;expiresAt:string;createdAt:string};
 export type Transaction={id:string;itemId:string;type:'IN'|'OUT'|'TRANSFER'|'ADJUSTMENT';qty:number;user:string;userId?:string;storeId:string;timestamp:string;note:string;targetStoreId?:string;recipient?:string;customerPhone?:string;reference?:string;buyPrice?:number;sellPrice?:number;unitPrice?:number;totalValue?:number;costValue?:number;profit?:number;receiptId?:string};
 export type Proforma={id:string;number:string;customerName:string;customerPhone?:string;storeId:string;userId:string;userName:string;timestamp:string;status:'DRAFT'|'VALIDATED';lines:{itemId:string;itemName:string;sku:string;unit:string;qty:number;unitPrice:number;amount:number}[];total:number;subtotal?:number;taxRate?:number;taxAmount?:number;taxInclusive?:boolean;reference?:string;note?:string;validatedAt?:string;validatedById?:string;validatedByName?:string;validatedBySignature?:string;receiptId?:string};
-export type Receipt={id:string;number:string;customerName:string;customerPhone?:string;storeId:string;userId:string;userName:string;timestamp:string;reference?:string;note?:string;subtotal?:number;taxRate?:number;taxAmount?:number;taxInclusive?:boolean;totalSales:number;totalCost:number;profit:number;transactionIds:string[];authorizerSignature?:string;authorizerName?:string};
+export type Receipt={id:string;number:string;customerName:string;customerPhone?:string;storeId:string;userId:string;userName:string;timestamp:string;reference?:string;note?:string;subtotal?:number;taxRate?:number;taxAmount?:number;taxInclusive?:boolean;totalSales:number;totalCost:number;profit:number;transactionIds:string[];authorizerSignature?:string;authorizerName?:string;proformaId?:string};
 export type AuditChange={field:string;before:unknown;after:unknown};
 export type AuditLog={id:string;action:string;entity:string;entityId:string;user:string;timestamp:string;details:string;changes?:AuditChange[]};
 export type PostedNote={id:string;message:string;userId:string;userName:string;timestamp:string};
@@ -24,9 +24,9 @@ function ensureDataFile(){
 }
 export function migrateDB(db:DB){
  db.proformas??=[]; db.stores??=[]; db.categories??=[]; db.items??=[]; db.users??=[]; db.transactions??=[]; db.receipts??=[]; db.auditLogs??=[]; db.activities??=[]; db.postedNotes??=[]; db.sessions??=[];
- db.roles??={Admin:rolePermissions('Admin')};
+ db.roles??={}; db.roles.Admin=rolePermissions('Admin');
  db.settings??={currency:'RWF',systemName:'InventoryPro HQ'}; db.settings.currency??='RWF'; db.settings.systemName??='InventoryPro HQ'; db.settings.logoDataUrl??=''; if(db.settings.taxRate!==undefined){db.settings.taxRate=Number(db.settings.taxRate);if(!Number.isFinite(db.settings.taxRate)||db.settings.taxRate<0||db.settings.taxRate>100)delete db.settings.taxRate;}
- for(const u of db.users){u.notes??='';u.receiptSignature??=''; delete (u as any).profilePicture;}
+ for(const u of db.users){u.notes??='';u.receiptSignature??=''; delete (u as {profilePicture?:unknown}).profilePicture; if(!u.role||!db.roles[u.role])u.status='Inactive';}
  for(const i of db.items){i.itemType??='General';i.measurementUnit??='Piece';i.status??='ACTIVE';if(i.status==='DISABLED'){i.disabledAt??=undefined; i.disabledById??=undefined; i.disabledByName??=undefined; i.disabledReason??=undefined;}}
  // Normalize every role against the single canonical privilege registry.
  for(const role of Object.keys(db.roles||{})) db.roles[role]=rolePermissions(role,db.roles[role]);
@@ -41,7 +41,13 @@ export function migrateDB(db:DB){
  }
  return db;
 }
-export function readDB():DB{ensureDataFile();return migrateDB(JSON.parse(fs.readFileSync(file,'utf8')) as DB);}
+export function readDB():DB{
+ ensureDataFile();
+ let parsed:unknown;
+ try { parsed=JSON.parse(fs.readFileSync(file,'utf8')); } catch { throw new Error(`Inventory database is invalid JSON at ${file}. Restore it from a known-good backup.`); }
+ if(!parsed || typeof parsed!=='object') throw new Error(`Inventory database at ${file} is malformed.`);
+ return migrateDB(parsed as DB);
+}
 export function writeDB(db:DB){if(!fs.existsSync(dataDir))fs.mkdirSync(dataDir,{recursive:true});migrateDB(db);const tmp=file+'.tmp';fs.writeFileSync(tmp,JSON.stringify(db,null,2));fs.renameSync(tmp,file);}
 export function nextId(prefix:string, records:{id:string}[]){const n=records.reduce((m,r)=>Math.max(m,Number(r.id.replace(/\D/g,''))||0),0)+1;return `${prefix}-${String(n).padStart(3,'0')}`;}
 

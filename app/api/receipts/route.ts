@@ -1,10 +1,11 @@
 import {NextResponse} from 'next/server';
 import {readDB,writeDB,nextId,audit,auditChange,taxCalculation} from '@/lib/db';
 import {can,requireUser} from '@/lib/auth';
+import {readJson,text as validateText,phone} from '@/lib/validation';
 const text=(v:unknown)=>String(v??'').trim();
 export async function POST(req:Request){try{
  const user=await requireUser(); if(!can(user,'generateReceipt'))return NextResponse.json({error:'Forbidden'},{status:403});
- const body=await req.json(); const customerName=text(body.customerName||body.recipient); const customerPhone=text(body.customerPhone); const reference=text(body.reference),note=text(body.note); const lines=Array.isArray(body.lines)?body.lines:[];
+ const body=await readJson<Record<string,unknown>>(req); const customerName=validateText(body.customerName||body.recipient,'Customer name',160); const customerPhone=phone(body.customerPhone); const reference=validateText(body.reference,'Reference',100),note=validateText(body.note,'Note',1000); const lines=Array.isArray(body.lines)?body.lines:[];
  if(!customerName)return NextResponse.json({error:'Customer name is required'},{status:400});
  if(customerPhone && !/^[0-9+() .-]{6,25}$/.test(customerPhone))return NextResponse.json({error:'Enter a valid customer phone number or leave it blank'},{status:400});
  if(!lines.length)return NextResponse.json({error:'Add at least one item to the receipt list'},{status:400}); if(lines.length>100)return NextResponse.json({error:'A receipt cannot contain more than 100 lines'},{status:400});

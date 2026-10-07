@@ -234,6 +234,14 @@ desktop/
   main.cjs             Electron desktop shell
 ```
 
+## Validation and system health
+
+All server-side write endpoints validate required fields, email addresses, passwords, dates, quantities, prices, phone numbers, image payloads, role names, store identifiers and configured tax rates. Invalid JSON requests return HTTP 400 instead of an opaque server error. The server never trusts the client-supplied tax rate for financial calculations; it reads the saved system tax rate.
+
+The local health endpoint is available at `/api/health`. It verifies that the JSON database can be read and that the configured data directory is writable, and reports the application process status.
+
+The Windows desktop shell automatically selects an available loopback port in the 3210–3259 range and uses a non-Secure session cookie for its local HTTP transport. Normal web production deployments continue to require a strong `SESSION_SECRET` and HTTPS.
+
 ## Requirements
 
 - Node.js 20+ recommended.
@@ -421,3 +429,29 @@ Recommended maintenance sequence:
 ## Current implementation boundary
 
 The application is optimized for local/single-server use with a JSON database. It provides strong application-level authorization and atomic file writes, but it does not provide distributed locking or multi-node transaction guarantees. For a horizontally scaled deployment, move persistence and sessions to a transactional shared database and preserve the same privilege checks.
+
+## Security and privileges
+
+InventoryPro HQ enforces privileges on the server/API boundary as well as in the user interface. Hidden navigation is only a usability control; it is not the security boundary. Direct API calls and direct receipt URLs are checked against the authenticated user role.
+
+The bootstrap payload is privilege-scoped: inventory, movements, stores, receipts, proformas, activities, users, roles, audit logs and posted notes are only returned when the corresponding privilege permits them. Users who can manage users cannot assign the Admin role or delegate privileges they do not themselves hold. Only an Admin can modify the Admin role or an Admin account, and the system preserves at least one active Admin account.
+
+The Windows desktop application runs its mutable database, session secret and logs from the current Windows user's application-data directory, avoiding write failures when the application is installed under Program Files. The embedded server binds only to 127.0.0.1.
+
+
+## Settings privileges
+Settings access is split into independent privileges. `manageProfile` controls My Profile and password/signature settings; `manageSettings` controls system name, logo, currency and tax; `backupSystem` controls system backup; and `resetSystemData` controls system reset. The Settings navigation item appears only when the user has at least one of these privileges, and unauthorized sections are omitted from the UI rather than rendered as disabled controls. Server-side APIs enforce the same permissions.
+
+## API ↔ UI permission synchronization
+
+The application uses `lib/permissions.ts` as the canonical privilege registry. Protected API operations and their corresponding UI modules/actions are synchronized through the same privilege names.
+
+Run:
+
+```bash
+npm run permission-check
+```
+
+The check validates that protected API operations have matching UI permission mappings and that module navigation is privilege-aware. Unauthorized actions are removed from the UI rather than rendered as permission-disabled controls.
+
+The authenticated `/api/bootstrap` endpoint is a filtered data aggregator and does not require `viewDashboard`; each returned dataset is controlled by the user's actual privileges. Settings configuration is independently protected by its Settings privileges.

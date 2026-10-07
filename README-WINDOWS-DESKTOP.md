@@ -78,3 +78,9 @@ Allow the application window to open popups/print windows and try again. Invento
 ### Data is missing after reset
 
 Reset is destructive by design. Restore the data from the backup using an appropriate controlled recovery procedure; the current application exposes backup creation, not an end-user restore workflow.
+
+### Desktop startup validation
+
+The desktop shell checks for the bundled standalone Next.js server, bundled Node.js runtime, writable application data directory and a free local port. It normally starts at port 3210 and automatically tries subsequent ports up to 3259 when needed. The selected port is local to the desktop process.
+
+The local health endpoint is available from the running application at `/api/health`.

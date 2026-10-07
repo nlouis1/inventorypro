@@ -1,10 +1,11 @@
 const { app, BrowserWindow, dialog } = require('electron');
 const { spawn } = require('node:child_process');
+const net = require('node:net');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const PORT = '3210';
+let PORT = '3210';
 // Acquire the lock before app readiness so a second launch never starts another server.
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 let serverProcess = null;
@@ -12,8 +13,9 @@ let mainWindow = null;
 let quitting = false;
 
 function appFolder() {
-  // Keep the database beside the executable so the whole portable folder can be backed up/moved.
-  return app.isPackaged ? path.dirname(app.getPath('exe')) : path.resolve(__dirname, '..');
+  // Packaged Windows applications may live under Program Files, which is not writable by normal users.
+  // Keep mutable database/session/log data in Electron's per-user application data directory.
+  return app.isPackaged ? app.getPath('userData') : path.resolve(__dirname, '..');
 }
 
 function ensureDatabaseFolder() {
@@ -31,6 +33,19 @@ function ensureDatabaseFolder() {
   return dataDir;
 }
 
+async function findFreePort(start = 3210) {
+  for (let port = start; port < start + 50; port += 1) {
+    const free = await new Promise((resolve) => {
+      const server = net.createServer();
+      server.once('error', () => resolve(false));
+      server.once('listening', () => server.close(() => resolve(true)));
+      server.listen(port, '127.0.0.1');
+    });
+    if (free) return String(port);
+  }
+  throw new Error('No free local application port was found between 3210 and 3259.');
+}
+
 function startServer() {
   const serverDir = path.join(process.resourcesPath, 'app-server');
   const serverFile = path.join(serverDir, 'server.js');
@@ -45,7 +60,9 @@ function startServer() {
     INVENTORY_DATA_DIR: ensureDatabaseFolder(),
     SESSION_SECRET: fs.readFileSync(path.join(appFolder(), 'data', '.session-secret'), 'utf8').trim(),
     NEXT_TELEMETRY_DISABLED: '1',
+    INVENTORY_DESKTOP: '1',
   };
+  fs.mkdirSync(env.INVENTORY_DATA_DIR, { recursive: true });
   const logFile = path.join(env.INVENTORY_DATA_DIR, 'server.log');
   const logStream = fs.createWriteStream(logFile, { flags: 'a' });
   logStream.write(`\n[${new Date().toISOString()}] Starting local application server on port ${PORT}\n`);
@@ -116,6 +133,7 @@ if (!hasSingleInstanceLock) {
   app.quit();
 } else app.whenReady().then(async () => {
   try {
+    PORT = await findFreePort();
     startServer();
     await createWindow();
   } catch (error) {
@@ -127,6 +145,8 @@ if (!hasSingleInstanceLock) {
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow().catch((e) => dialog.showErrorBox('Startup failed', String(e))); });
 app.on('before-quit', () => {
   quitting = true;
-  if (serverProcess && !serverProcess.killed) serverProcess.kill();
+  if (serverProcess && !serverProcess.killed) {
+    try { serverProcess.kill(); } catch (_) {}
+  }
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

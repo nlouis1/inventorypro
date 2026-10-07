@@ -1,6 +1,6 @@
 {
   "name": "inventorypro-hq",
-  "version": "1.0.0",
+  "version": "1.8.7",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,14 @@
     "lint": "npm run typecheck",
     "desktop:package": "node scripts/package-desktop.cjs",
     "desktop:build": "npm run build && npm run desktop:package",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "self-check": "node scripts/self-check.cjs",
+    "settings-check": "node scripts/settings-privilege-check.cjs",
+    "permission-check": "node scripts/permission-sync-check.cjs",
+    "permission-ui-audit": "node scripts/permission-ui-audit.cjs",
+    "hook-order-check": "node scripts/hook-order-check.cjs",
+    "item-autocomplete-check": "node scripts/item-autocomplete-check.cjs",
+    "opening-stock-check": "node scripts/opening-stock-report-check.cjs"
   },
   "dependencies": {
     "next": "15.5.4",
@@ -21,12 +28,12 @@
     "sweetalert2": "^11.26.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "electron": "^37.2.6",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.6.3"
   },
   "build": {
     "appId": "rw.inventorypro.hq",
